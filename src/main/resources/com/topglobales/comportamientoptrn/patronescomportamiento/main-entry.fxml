@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<VBox spacing="15.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.topglobales.comportamientoptrn.patronescomportamiento.MainController">
+    <padding>
+        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+    </padding>
+    <children>
+        <Label text="Notification System Demo (Strategy, Observer, Template Method)">
+            <font>
+                <Font name="System Bold" size="18.0" />
+            </font>
+        </Label>
+
+        <SplitPane dividerPositions="0.35" VBox.vgrow="ALWAYS">
+            <items>
+                <VBox spacing="10.0" minWidth="250.0">
+                    <children>
+                        <Label text="Users:" style="-fx-font-weight: bold;" />
+                        <ListView fx:id="userListView" prefHeight="150.0" />
+
+                        <Separator/>
+
+                        <Label text="Selected User Details:" style="-fx-font-weight: bold;" />
+                        <GridPane hgap="10.0" vgap="5.0">
+                            <columnConstraints>
+                                <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="100.0"/>
+                                <ColumnConstraints hgrow="SOMETIMES" />
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                            </rowConstraints>
+                            <children>
+                                <Label text="Name:" GridPane.rowIndex="0" />
+                                <Label fx:id="lblUserName" text="-" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                                <Label text="Email:" GridPane.rowIndex="1" />
+                                <Label fx:id="lblUserEmail" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                <Label text="Phone:" GridPane.rowIndex="2" />
+                                <Label fx:id="lblUserPhone" text="-" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                <Label text="Notify Via:" GridPane.rowIndex="3"/>
+                                <ComboBox fx:id="cmbStrategies" prefWidth="180.0" promptText="Select Channel..." GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                            </children>
+                            <padding><Insets top="5.0" bottom="10.0"/></padding>
+                        </GridPane>
+                        <Button fx:id="btnUpdateStrategy" mnemonicParsing="false" onAction="#handleUpdateStrategy" text="Update Preference" disable="true">
+                            <VBox.margin>
+                                <Insets left="110.0" />
+                            </VBox.margin>
+                        </Button>
+                    </children>
+                    <padding><Insets right="10.0"/></padding>
+                </VBox>
+
+                <!-- Right Side: Event Triggering and Log -->
+                <VBox spacing="10.0">
+                    <children>
+                        <Label text="Trigger Event:" style="-fx-font-weight: bold;" />
+                        <HBox spacing="10.0" alignment="CENTER_LEFT">
+                            <children>
+                                <Label text="Message:" />
+                                <TextField fx:id="txtEventMessage" promptText="Enter notification message..." HBox.hgrow="ALWAYS" />
+                            </children>
+                        </HBox>
+                        <FlowPane hgap="10.0" vgap="5.0">
+                            <children>
+                                <Button fx:id="btnTriggerSecurity" mnemonicParsing="false" onAction="#handleTriggerEvent" text="Trigger Security Alert" />
+                                <Button fx:id="btnTriggerProfile" mnemonicParsing="false" onAction="#handleTriggerEvent" text="Trigger Profile Update" />
+                                <Button fx:id="btnTriggerPromo" mnemonicParsing="false" onAction="#handleTriggerEvent" text="Trigger Promotion" />
+                                <Button fx:id="btnTriggerSystem" mnemonicParsing="false" onAction="#handleTriggerEvent" text="Trigger System Update" />
+                            </children>
+                        </FlowPane>
+
+                        <Separator/>
+
+                        <Label text="Notification Log:" style="-fx-font-weight: bold;" />
+                        <TextArea fx:id="txtLogOutput" editable="false" wrapText="true" VBox.vgrow="ALWAYS" prefHeight="300.0"/>
+                    </children>
+                    <padding><Insets left="10.0"/></padding>
+                </VBox>
+            </items>
+        </SplitPane>
+    </children>
+</VBox>
