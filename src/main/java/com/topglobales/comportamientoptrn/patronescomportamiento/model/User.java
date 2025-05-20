@@ -1,6 +1,7 @@
 package com.topglobales.comportamientoptrn.patronescomportamiento.model;
 
 import com.topglobales.comportamientoptrn.patronescomportamiento.command.Command;
+import com.topglobales.comportamientoptrn.patronescomportamiento.command.NotificationInvoker;
 import com.topglobales.comportamientoptrn.patronescomportamiento.command.SendNotificationCommand;
 import javafx.application.Platform;
 import javafx.scene.control.TextArea;
@@ -28,12 +29,35 @@ public abstract class User implements EventListener {
     @Getter
     protected NotificationStrategy preferredStrategy;
 
+    @Getter
+    private boolean blocked = false; // Field for blocked status
+
+    @Setter
+    private NotificationInvoker invoker; // For Command Pattern
+
     public User(String name, String email, String phoneNumber, NotificationStrategy initialStrategy) {
         this.name = Objects.requireNonNull(name, "name cannot be null");
         this.email = Objects.requireNonNull(email, "email cannot be null");
         this.phoneNumber = Objects.requireNonNull(phoneNumber, "phoneNumber cannot be null");
         this.preferredStrategy = Objects.requireNonNull(initialStrategy, "initialStrategy cannot be null");
     }
+
+    /**
+     * Sets the blocked status of the user.
+     * @param blocked true if the user should be blocked, false otherwise.
+     */
+    public void setBlocked(boolean blocked) {
+        this.blocked = blocked;
+        String status = blocked ? "blocked" : "unblocked";
+        String logMsg = String.format("--- User [%s] is now %s. ---", getName(), status);
+        // Log this change, check if logTarget is available
+        if (this.logTarget != null) {
+            logToUI(logMsg); // logToUI adds its own newlines
+        } else {
+            System.out.println(logMsg + "\n"); // Fallback with newline
+        }
+    }
+
 
     // Helper to safely append text to the TextArea from any thread (JVM does not like ConcurrentModification at the same time as other threads)
     protected void logToUI(String message) {
@@ -98,7 +122,7 @@ public abstract class User implements EventListener {
     /**
      * Concrete Observer Method: Called when an event this user is subscribed to occurs.
      * It formats the message using the Template Method, creates a Command to send it,
-     * and then executes the command.
+     * and then executes the command via an Invoker.
      */
     @Override
     public void update(String eventType, String message) {
@@ -123,12 +147,24 @@ public abstract class User implements EventListener {
                 this.preferredStrategy,
                 this.logTarget // Pass the logTarget to the command
         );
-        sendNotificationCmd.execute();
+
+        if (this.invoker != null) {
+            this.invoker.setCommand(sendNotificationCmd); // Use invoker to execute
+        } else {
+            // Fallback or error if invoker is expected but not set
+            String errorMsg = String.format("--- User [%s]: NotificationInvoker not set. Executing command directly. ---", getName());
+            if (this.logTarget != null) {
+                Platform.runLater(() -> this.logTarget.appendText(errorMsg + "\n"));
+            } else {
+                System.err.println(errorMsg);
+            }
+            sendNotificationCmd.execute(); // Direct execution as fallback
+        }
     }
 
     /**
      * Allows changing the user's preferred notification channel (Strategy).
-     * @param strategy The new NotificationStrategy to use.
+     * @param strategy NotificationStrategy to use.
      */
     public void setPreferredStrategy(NotificationStrategy strategy) {
         this.preferredStrategy = Objects.requireNonNull(strategy, "strategy cannot be null");

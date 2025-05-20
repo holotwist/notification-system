@@ -57,7 +57,7 @@ public class EventManager {
 
     /**
      * Notifies all listeners subscribed to a specific event type,
-     * after passing the message through a validation chain.
+     * after passing the message through a validation chain for each relevant listener.
      *
      * @param eventType The type of event that occurred.
      * @param message   The raw message data associated with the event.
@@ -65,48 +65,56 @@ public class EventManager {
      */
     public void notify(String eventType, String message, TextArea logTarget) {
         Objects.requireNonNull(eventType, "eventType cannot be null");
+        // Message content validation (e.g., not empty) will be handled by the chain.
 
-        String initialLog = String.format("--- EventManager: Received event [%s] with message: \"%s\" ---",
+        String initialLog = String.format("--- EventManager: Received event [%s] with raw message: \"%s\" ---",
                 eventType, message);
         logToUI(initialLog + "\n", logTarget);
 
-
-        // --- Chain of Responsibility: Validate the notification ---
-        NotificationContext notificationContext = new NotificationContext(eventType, message, logTarget);
-        if (validationChain != null) {
-            logToUI("--- EventManager: Starting validation chain... ---\n", logTarget);
-            boolean isValid = validationChain.validate(notificationContext);
-            if (!isValid || !notificationContext.isValid()) { // Check both chain's return and context's flag
-                logToUI(String.format("--- EventManager: Validation failed for event [%s]. Notification aborted. ---\nReasons:\n%s\n",
-                                eventType, String.join("\n", notificationContext.getValidationMessages())),
-                        logTarget);
-                return; // Stop processing if validation fails
-            }
-            logToUI("--- EventManager: Validation chain completed successfully. ---\n", logTarget);
-        } else {
-            logToUI("--- EventManager: No validation chain configured. Proceeding directly. ---\n", logTarget);
-        }
-        // Use validated/original message.
-        // A more complex system might allow validators to modify the message. (perhaps in the future add that)
-        String messageToDispatch = notificationContext.getOriginalMessage();
-
-
         List<EventListener> eventListeners = listeners.get(eventType);
-        String notifyLog = String.format("--- EventManager: Triggering event [%s] for %d listener(s) ---",
-                eventType, eventListeners != null ? eventListeners.size() : 0);
-        logToUI(notifyLog + "\n", logTarget);
 
-
-        if (eventListeners != null && !eventListeners.isEmpty()) {
-            // Iterate over a copy to prevent ConcurrentModificationException (A try to manual Optimistic Locking)
-            for (EventListener listener : new ArrayList<>(eventListeners)) {
-                // The listener's update method will now use the Command pattern
-                listener.update(eventType, messageToDispatch);
-            }
-        } else {
+        if (eventListeners == null || eventListeners.isEmpty()) {
             String noListenersLog = String.format("--- EventManager: No listeners for event [%s]. ---", eventType);
             logToUI(noListenersLog + "\n\n", logTarget);
+            return;
         }
+
+        String preNotifyLog = String.format("--- EventManager: Processing event [%s] for %d listener(s) ---",
+                eventType, eventListeners.size());
+        logToUI(preNotifyLog + "\n", logTarget);
+
+        for (EventListener listener : new ArrayList<>(eventListeners)) { // Iterate over a copy
+            User targetUser = (listener instanceof User) ? (User) listener : null;
+            String listenerName = getListenerName(listener);
+
+            // --- Chain of Responsibility: Validate the notification for this specific listener context ---
+            // Context now includes the specific user if applicable, or null if listener is not a User.
+            NotificationContext notificationContext = new NotificationContext(eventType, message, logTarget, targetUser);
+
+            if (validationChain != null) {
+                logToUI(String.format("--- EventManager: Starting validation chain for %s... ---\n", listenerName), logTarget);
+                boolean chainPassed = validationChain.validate(notificationContext); // This updates context.isValid
+
+                if (!chainPassed) { // If chain indicates failure (a validator returned false).
+                    // The context's isValid flag should also be false.
+                    logToUI(String.format("--- EventManager: Validation failed for %s regarding event [%s]. Notification aborted for this recipient. ---\nReasons:\n%s\n",
+                                    listenerName, eventType, String.join("\n", notificationContext.getValidationMessages())),
+                            logTarget);
+                    continue; // Skip to the next listener
+                }
+                logToUI(String.format("--- EventManager: Validation chain completed successfully for %s. ---\n", listenerName), logTarget);
+            } else {
+                // No validation chain configured, proceed directly for this listener.
+                logToUI(String.format("--- EventManager: No validation chain for %s. Proceeding directly. ---\n", listenerName), logTarget);
+            }
+
+            // Use validated/original message. A more complex system might allow validators to modify the message. (For now, I don't want to add that)
+            String messageToDispatch = notificationContext.getOriginalMessage();
+
+            logToUI(String.format("--- EventManager: Notifying %s for event [%s]... --- \n", listenerName, eventType), logTarget);
+            listener.update(eventType, messageToDispatch);
+        }
+        logToUI(String.format("--- EventManager: Finished processing event [%s] for all applicable listeners. ---\n\n", eventType), logTarget);
     }
 
     private void logToUI(String message, TextArea logTarget) {
@@ -117,7 +125,7 @@ public class EventManager {
         }
     }
 
-    // Helper to get a printable name for the listener (assuming it's a User)
+    // Helper to get a printable name for the listener
     private String getListenerName(EventListener listener) {
         if (listener instanceof User) {
             return ((User) listener).getName();

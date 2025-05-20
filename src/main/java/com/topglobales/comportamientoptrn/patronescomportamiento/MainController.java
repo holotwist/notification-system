@@ -1,6 +1,8 @@
 package com.topglobales.comportamientoptrn.patronescomportamiento;
 
 import com.topglobales.comportamientoptrn.patronescomportamiento.model.*;
+import com.topglobales.comportamientoptrn.patronescomportamiento.command.NotificationInvoker;
+import com.topglobales.comportamientoptrn.patronescomportamiento.validator.BlockedUserValidator;
 import com.topglobales.comportamientoptrn.patronescomportamiento.validator.MessageNotEmptyValidator;
 import com.topglobales.comportamientoptrn.patronescomportamiento.validator.ProfanityFilterValidator;
 import com.topglobales.comportamientoptrn.patronescomportamiento.validator.ValidationHandler;
@@ -29,6 +31,7 @@ public class MainController {
 
     // --- Backend System Components ---
     private EventManager eventManager;
+    private NotificationInvoker notificationInvoker;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<NotificationStrategy> strategies = FXCollections.observableArrayList();
 
@@ -52,13 +55,19 @@ public class MainController {
     }
 
     private void setupNotificationSystem() {
+        // --- Create Notification Invoker ---
+        this.notificationInvoker = new NotificationInvoker(txtLogOutput);
+        log("NotificationInvoker initialized.\n");
+
         // --- Create Validation Chain (Chain of Responsibility) ---
         ValidationHandler validationChain = new MessageNotEmptyValidator();
-        validationChain.setNext(new ProfanityFilterValidator());
-        // Here goes more validations, maybe future
+        validationChain.setNext(new ProfanityFilterValidator())
+                .setNext(new BlockedUserValidator()); // Added BlockedUserValidator
 
         // Pass the head of the chain to EventManager
         eventManager = new EventManager(validationChain);
+        log("EventManager initialized with validation chain.\n");
+
 
         // --- Create and Populate Strategies first ---
         NotificationStrategy emailStrategy = new EmailNotification();
@@ -76,24 +85,30 @@ public class MainController {
 
         users.addAll(admin, client1, client2, guest);
 
-        // Link users to the log TextArea
+        // Link users to the log TextArea and set invoker
         for (User user : users) {
             if (txtLogOutput != null) {
                 user.setLogTarget(txtLogOutput);
             } else {
                 System.err.println("WARN: txtLogOutput is null during user setup!");
             }
+            user.setInvoker(this.notificationInvoker); // Set invoker for each user
         }
+
+        // Example: Set a user as blocked for demonstration (Hardcoded)
+        client2.setBlocked(true); // Charlie Client is now blocked
+        // Log initial status - user.setBlocked() already logs to UI if logTarget is set.
 
         // Subscribe Users to Events (Example data, hardcoded)
         eventManager.subscribe("securityAlert", admin);
         eventManager.subscribe("systemUpdate", admin);
         eventManager.subscribe("profileUpdate", client1);
         eventManager.subscribe("promotion", client1);
-        eventManager.subscribe("profileUpdate", client2);
+        eventManager.subscribe("profileUpdate", client2); // Charlie (blocked) is subscribed
         eventManager.subscribe("promotion", guest);
 
-        log("Validation chain configured: MessageNotEmptyValidator -> ProfanityFilterValidator\n");
+        log("Validation chain configured: MessageNotEmptyValidator -> ProfanityFilterValidator -> BlockedUserValidator\n");
+        log(String.format("Initial status: User %s is %s.\n", client2.getName(), client2.isBlocked() ? "blocked" : "not blocked"));
     }
 
     private void displayUserDetails(User user) {
@@ -103,6 +118,7 @@ public class MainController {
             lblUserPhone.setText(user.getPhoneNumber());
             cmbStrategies.setValue(user.getPreferredStrategy());
             btnUpdateStrategy.setDisable(false);
+            // Could add a display for user.isBlocked() here if someone wants...
         } else {
             lblUserName.setText("-");
             lblUserEmail.setText("-");
@@ -120,6 +136,7 @@ public class MainController {
         if (selectedUser != null && selectedStrategy != null) {
             if (selectedUser.getPreferredStrategy() != selectedStrategy) {
                 selectedUser.setPreferredStrategy(selectedStrategy);
+                // Log already handled by setPreferredStrategy
             } else {
                 log(String.format("User %s already prefers %s. No change made.\n", selectedUser.getName(), selectedStrategy));
             }
@@ -143,13 +160,16 @@ public class MainController {
 
         // txtLogOutput is passed to EventManager.notify for CoR validators and EventManager itself to log.
         // User objects (Observers) already have their logTarget set.
+        // NotificationInvoker also uses this logTarget.
         eventManager.notify(eventType, message, txtLogOutput); // Pass raw message
     }
 
     private void log(String message) {
         // Ensure Platform.runLater if logging from non-FX thread, but these calls are from FX thread, so, it's preferred FX thread.
         if (txtLogOutput != null) {
-            txtLogOutput.appendText(message + "\n"); // Add only one newline, others will add their own.
+            txtLogOutput.appendText(message); // Append directly, expecting message to have its own newlines if needed or be part of a sequence.
+            // For standalone logs, add newline if not present.
+            // Most logging methods in the system now add their own newlines.
         } else {
             System.out.println("LOG (txtLogOutput is null): " + message); // Fallback
         }
